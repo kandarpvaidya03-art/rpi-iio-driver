@@ -6,6 +6,7 @@ import os
 import statistics
 import struct
 import sys
+import time
 
 NAME = "adxl345_learn"
 RECORD = struct.Struct("<3h2xq")  # X, Y, Z, 2 padding bytes, timestamp in ns
@@ -33,15 +34,41 @@ def read(path):
         return f.read().strip()
 
 
+def cpu_ticks():
+    """Return (total, idle) CPU ticks summed over all cores."""
+    with open("/proc/stat") as f:
+        fields = [int(v) for v in f.readline().split()[1:9]]
+    return sum(fields), fields[3] + fields[4]
+
+
+def cpu_busy(before, after):
+    """System-wide busy time between two readings, as a percentage of one core."""
+    total = after[0] - before[0]
+    idle = after[1] - before[1]
+    if total <= 0:
+        return 0.0
+    return 100.0 * (total - idle) / total * os.cpu_count()
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--rate", default="100", help="sampling frequency in Hz")
     ap.add_argument("--samples", type=int, default=1000)
     ap.add_argument("--buflen", type=int, default=1024,
                     help="kernel buffer length in samples")
-    ap.add_argument("--skip", type=int, default=5, help="startup samples left out of the statistics")
+    ap.add_argument("--skip", type=int, default=5,
+                    help="startup samples left out of the statistics")
+    ap.add_argument("--baseline", type=float, metavar="SECONDS",
+                    help="only measure idle CPU load for this long, no capture")
     ap.add_argument("--csv", help="write samples to this CSV file")
     args = ap.parse_args()
+
+    if args.baseline:
+        before = cpu_ticks()
+        time.sleep(args.baseline)
+        print(f"idle baseline     : {cpu_busy(before, cpu_ticks()):.2f} % of one core"
+              f" over {args.baseline:.0f} s")
+        return
 
     dev = find_device()
     node = "/dev/" + os.path.basename(dev)
@@ -58,6 +85,7 @@ def main():
     pending = b""
 
     write(f"{dev}/buffer/enable", 1)
+    cpu_before = cpu_ticks()
     try:
         with open(node, "rb", buffering=0) as f:
             while len(records) < wanted:
@@ -69,6 +97,7 @@ def main():
                     records.append(RECORD.unpack_from(pending))
                     pending = pending[RECORD.size:]
     finally:
+        cpu_after = cpu_ticks()
         write(f"{dev}/buffer/enable", 0)
 
     records = records[args.skip:]
@@ -92,6 +121,7 @@ def main():
     print(f"min/max at index  : {gaps.index(min(gaps))} / {gaps.index(max(gaps))}")
     print(f"interval std dev  : {statistics.stdev(gaps) / 1e6:.4f} ms")
     print(f"gaps > 1.5 median : {len(long_gaps)}")
+    print(f"CPU busy          : {cpu_busy(cpu_before, cpu_after):.2f} % of one core")
     for axis, name in enumerate("XYZ"):
         mean = statistics.mean(r[axis] for r in records)
         print(f"mean {name}            : {mean:8.2f} counts  {mean * scale:8.3f} m/s^2")
