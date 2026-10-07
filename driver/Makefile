@@ -1,4 +1,4 @@
-obj-m += hello.o
+obj-m += hello.o adxl345_learn.o
 KDIR ?= /lib/modules/$(shell uname -r)/build
 
 all:
