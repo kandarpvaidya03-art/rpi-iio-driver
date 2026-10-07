@@ -9,3 +9,4 @@ modules.order
 *.dtbo
 Module.symvers
 modules.order
+buildroot/board/authorized_keys

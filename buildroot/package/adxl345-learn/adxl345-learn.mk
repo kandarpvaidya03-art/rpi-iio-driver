@@ -1,0 +1,7 @@
+ADXL345_LEARN_VERSION = 1.0
+ADXL345_LEARN_SITE = $(BR2_EXTERNAL_ADXL345_LEARN_PATH)/../driver
+ADXL345_LEARN_SITE_METHOD = local
+ADXL345_LEARN_LICENSE = GPL-2.0
+
+$(eval $(kernel-module))
+$(eval $(generic-package))

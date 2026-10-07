@@ -1,0 +1,22 @@
+#!/bin/sh
+# Quick on-target check of the adxl345_learn driver.
+DEV=""
+for d in /sys/bus/iio/devices/iio:device*; do
+    [ "$(cat "$d/name" 2>/dev/null)" = "adxl345_learn" ] && DEV="$d"
+done
+[ -n "$DEV" ] || { echo "FAIL: no adxl345_learn IIO device"; exit 1; }
+
+echo "device : $DEV"
+echo "scale  : $(cat "$DEV/in_accel_scale")"
+echo "rate   : $(cat "$DEV/sampling_frequency") Hz"
+echo "raw    : $(cat "$DEV/in_accel_x_raw") $(cat "$DEV/in_accel_y_raw") $(cat "$DEV/in_accel_z_raw")"
+
+for ch in in_accel_x in_accel_y in_accel_z in_timestamp; do
+    echo 1 > "$DEV/scan_elements/${ch}_en"
+done
+echo 64 > "$DEV/buffer/length"
+echo 1 > "$DEV/buffer/enable"
+echo "buffer : 10 records (X Y Z pad, then timestamp in four parts)"
+head -c 160 "/dev/$(basename "$DEV")" | hexdump -v -e '8/2 "%7d" "\n"'
+echo 0 > "$DEV/buffer/enable"
+echo "PASS"

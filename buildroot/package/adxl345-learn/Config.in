@@ -1,0 +1,5 @@
+config BR2_PACKAGE_ADXL345_LEARN
+    bool "adxl345-learn"
+    depends on BR2_LINUX_KERNEL
+    help
+      Out-of-tree IIO driver for the ADXL345 accelerometer.

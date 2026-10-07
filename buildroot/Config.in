@@ -1,0 +1,1 @@
+source "$BR2_EXTERNAL_ADXL345_LEARN_PATH/package/adxl345-learn/Config.in"

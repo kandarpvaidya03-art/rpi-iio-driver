@@ -1,0 +1,7 @@
+kernel=Image
+disable_overscan=1
+
+# Header I2C bus at 400 kHz, and the ADXL345 bound to adxl345_learn
+dtparam=i2c_arm=on
+dtparam=i2c_arm_baudrate=400000
+dtoverlay=adxl345-learn
