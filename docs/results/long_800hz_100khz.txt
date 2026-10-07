@@ -1,0 +1,12 @@
+requested rate    : 800 Hz
+samples captured  : 470000
+duration          : 598.602 s
+measured rate     : 785.161 Hz
+interval mean     : 1.2736 ms
+interval median   : 1.2736 ms
+interval min/max  : 0.8845 / 1.2855 ms
+interval std dev  : 0.0007 ms
+gaps > 1.5 median : 0
+mean X            :    10.16 counts     0.388 m/s^2
+mean Y            :  -143.61 counts    -5.492 m/s^2
+mean Z            :  -254.03 counts    -9.716 m/s^2
