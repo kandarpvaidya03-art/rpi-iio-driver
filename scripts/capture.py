@@ -52,9 +52,7 @@ def main():
     write(f"{dev}/buffer/length", args.buflen)
     scale = float(read(f"{dev}/in_accel_scale"))
 
-    # The first record after enabling carries a stale sample, so take one
-    # extra and drop it.
-    wanted = args.samples + 1
+    wanted = args.samples
     records = []
     pending = b""
 
@@ -72,7 +70,6 @@ def main():
     finally:
         write(f"{dev}/buffer/enable", 0)
 
-    records = records[1:]
     if len(records) < 3:
         sys.exit("Not enough samples captured.")
 

@@ -179,9 +179,23 @@ static int adxl345_learn_set_trigger_state(struct iio_trigger *trig, bool state)
 {
 	struct iio_dev *indio_dev = iio_trigger_get_drvdata(trig);
 	struct adxl345_learn_state *st = iio_priv(indio_dev);
+	u8 discard[6];
+	int ret;
+
+	if (!state)
+		return regmap_write(st->regmap, ADXL345_REG_INT_ENABLE, 0);
+
+	/*
+	 * DATA_READY may already be set by a sample taken before capture
+	 * started. Read it out so the first interrupt belongs to a new sample.
+	 */
+	ret = regmap_bulk_read(st->regmap, ADXL345_REG_DATAX0,
+			       discard, sizeof(discard));
+	if (ret)
+		return ret;
 
 	return regmap_write(st->regmap, ADXL345_REG_INT_ENABLE,
-			    state ? ADXL345_INT_DATA_READY : 0);
+			    ADXL345_INT_DATA_READY);
 }
 
 static const struct iio_trigger_ops adxl345_learn_trigger_ops = {
@@ -212,7 +226,10 @@ static irqreturn_t adxl345_learn_trigger_handler(int irq, void *p)
 	/* The burst read also clears DATA_READY and releases INT1 */
 	ret = regmap_bulk_read(st->regmap, ADXL345_REG_DATAX0,
 			       st->scan.chans, sizeof(st->scan.chans));
-	if (!ret)
+	if (ret)
+		dev_err_ratelimited(indio_dev->dev.parent,
+				    "failed to read sample: %d\n", ret);
+	else
 		iio_push_to_buffers_with_timestamp(indio_dev, &st->scan, ts);
 
 	iio_trigger_notify_done(indio_dev->trig);
@@ -349,5 +366,5 @@ static struct i2c_driver adxl345_learn_driver = {
 module_i2c_driver(adxl345_learn_driver);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Kandarp");
+MODULE_AUTHOR("Kandarp Vaidya");
 MODULE_DESCRIPTION("Learning IIO driver for the ADXL345 accelerometer");
