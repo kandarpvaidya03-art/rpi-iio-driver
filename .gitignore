@@ -7,3 +7,5 @@ Modules.symvers
 modules.order
 .tmp_versions/
 *.dtbo
+Module.symvers
+modules.order
