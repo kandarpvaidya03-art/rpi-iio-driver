@@ -7,10 +7,6 @@
     fragment@0 {
         target = <&i2c_arm>;
         __overlay__ {
-            #address-cells = <1>;
-            #size-cells = <0>;
-            status = "okay";
-
             adxl345_learn: adxl345@53 {
                 compatible = "rpi,adxl345-learn";
                 reg = <0x53>;
