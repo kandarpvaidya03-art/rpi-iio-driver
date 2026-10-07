@@ -39,6 +39,7 @@ def main():
     ap.add_argument("--samples", type=int, default=1000)
     ap.add_argument("--buflen", type=int, default=1024,
                     help="kernel buffer length in samples")
+    ap.add_argument("--skip", type=int, default=5, help="startup samples left out of the statistics")
     ap.add_argument("--csv", help="write samples to this CSV file")
     args = ap.parse_args()
 
@@ -52,7 +53,7 @@ def main():
     write(f"{dev}/buffer/length", args.buflen)
     scale = float(read(f"{dev}/in_accel_scale"))
 
-    wanted = args.samples
+    wanted = args.samples + args.skip
     records = []
     pending = b""
 
@@ -70,6 +71,7 @@ def main():
     finally:
         write(f"{dev}/buffer/enable", 0)
 
+    records = records[args.skip:]
     if len(records) < 3:
         sys.exit("Not enough samples captured.")
 
@@ -81,11 +83,13 @@ def main():
 
     print(f"requested rate    : {args.rate} Hz")
     print(f"samples captured  : {len(records)}")
+    print(f"startup skipped   : {args.skip}")
     print(f"duration          : {duration:.3f} s")
     print(f"measured rate     : {(len(records) - 1) / duration:.3f} Hz")
     print(f"interval mean     : {statistics.mean(gaps) / 1e6:.4f} ms")
     print(f"interval median   : {median / 1e6:.4f} ms")
     print(f"interval min/max  : {min(gaps) / 1e6:.4f} / {max(gaps) / 1e6:.4f} ms")
+    print(f"min/max at index  : {gaps.index(min(gaps))} / {gaps.index(max(gaps))}")
     print(f"interval std dev  : {statistics.stdev(gaps) / 1e6:.4f} ms")
     print(f"gaps > 1.5 median : {len(long_gaps)}")
     for axis, name in enumerate("XYZ"):

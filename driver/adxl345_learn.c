@@ -53,6 +53,8 @@ static const int adxl345_learn_samp_freq[][2] = {
 struct adxl345_learn_state {
 	struct regmap *regmap;
 	struct iio_trigger *trig;
+	/* Set when capture starts; the first sample is read but not pushed */
+	bool skip_first;
 	/* One scan: X, Y, Z as read from the device, then the timestamp */
 	struct {
 		__le16 chans[3];
@@ -179,20 +181,17 @@ static int adxl345_learn_set_trigger_state(struct iio_trigger *trig, bool state)
 {
 	struct iio_dev *indio_dev = iio_trigger_get_drvdata(trig);
 	struct adxl345_learn_state *st = iio_priv(indio_dev);
-	u8 discard[6];
-	int ret;
 
 	if (!state)
 		return regmap_write(st->regmap, ADXL345_REG_INT_ENABLE, 0);
 
 	/*
-	 * DATA_READY may already be set by a sample taken before capture
-	 * started. Read it out so the first interrupt belongs to a new sample.
+	 * DATA_READY is usually already set when capture starts, so the first
+	 * interrupt fires at once and says nothing about when that sample was
+	 * taken. The handler reads that sample to release INT1 but does not
+	 * push it.
 	 */
-	ret = regmap_bulk_read(st->regmap, ADXL345_REG_DATAX0,
-			       discard, sizeof(discard));
-	if (ret)
-		return ret;
+	st->skip_first = true;
 
 	return regmap_write(st->regmap, ADXL345_REG_INT_ENABLE,
 			    ADXL345_INT_DATA_READY);
@@ -229,6 +228,8 @@ static irqreturn_t adxl345_learn_trigger_handler(int irq, void *p)
 	if (ret)
 		dev_err_ratelimited(indio_dev->dev.parent,
 				    "failed to read sample: %d\n", ret);
+	else if (st->skip_first)
+		st->skip_first = false;
 	else
 		iio_push_to_buffers_with_timestamp(indio_dev, &st->scan, ts);
 
