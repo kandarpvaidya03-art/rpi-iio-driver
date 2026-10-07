@@ -1,0 +1,32 @@
+requested rate    : 100 Hz (polled)
+measured rate     : 100.000 Hz
+missed deadlines  : 0
+CPU userspace     :     57.72 ms
+CPU IRQ thread    :      0.00 ms
+CPU total         :     57.72 ms  (0.57 % of one core)
+CPU per sample    :     57.43 us
+
+requested rate    : 200 Hz (polled)
+measured rate     : 200.000 Hz
+missed deadlines  : 0
+CPU userspace     :    108.65 ms
+CPU IRQ thread    :      0.00 ms
+CPU total         :    108.65 ms  (1.08 % of one core)
+CPU per sample    :     54.19 us
+
+requested rate    : 400 Hz (polled)
+measured rate     : 400.000 Hz
+missed deadlines  : 0
+CPU userspace     :    209.40 ms
+CPU IRQ thread    :      0.00 ms
+CPU total         :    209.40 ms  (2.09 % of one core)
+CPU per sample    :     52.28 us
+
+requested rate    : 800 Hz (polled)
+measured rate     : 650.447 Hz
+missed deadlines  : 8000
+CPU userspace     :    381.75 ms
+CPU IRQ thread    :      0.00 ms
+CPU total         :    381.75 ms  (3.10 % of one core)
+CPU per sample    :     47.69 us
+

@@ -34,20 +34,39 @@ def read(path):
         return f.read().strip()
 
 
-def cpu_ticks():
-    """Return (total, idle) CPU ticks summed over all cores."""
-    with open("/proc/stat") as f:
-        fields = [int(v) for v in f.readline().split()[1:9]]
-    return sum(fields), fields[3] + fields[4]
+def _run_ns(path):
+    """First field of a schedstat file: exact time spent on a CPU, in ns."""
+    try:
+        with open(path) as f:
+            return int(f.read().split()[0])
+    except (OSError, ValueError, IndexError):
+        return 0
 
 
-def cpu_busy(before, after):
-    """System-wide busy time between two readings, as a percentage of one core."""
-    total = after[0] - before[0]
-    idle = after[1] - before[1]
-    if total <= 0:
-        return 0.0
-    return 100.0 * (total - idle) / total * os.cpu_count()
+def runtime_ns():
+    """Return (this process, driver IRQ thread) on-CPU time in ns."""
+    own = sum(_run_ns(p) for p in glob.glob("/proc/self/task/*/schedstat"))
+    irq = 0
+    for comm in glob.glob("/proc/[0-9]*/comm"):
+        try:
+            with open(comm) as f:
+                name = f.read().strip()
+        except OSError:
+            continue
+        if name.startswith("irq/") and "adxl345" in name:
+            irq += _run_ns(os.path.dirname(comm) + "/schedstat")
+    return own, irq
+
+
+def print_cpu(before, after, wall_s, samples):
+    own = after[0] - before[0]
+    irq = after[1] - before[1]
+    total = own + irq
+    print(f"CPU userspace     : {own / 1e6:9.2f} ms")
+    print(f"CPU IRQ thread    : {irq / 1e6:9.2f} ms")
+    print(f"CPU total         : {total / 1e6:9.2f} ms"
+          f"  ({100 * total / 1e9 / wall_s:.2f} % of one core)")
+    print(f"CPU per sample    : {total / 1e3 / samples:9.2f} us")
 
 
 def main():
@@ -58,17 +77,8 @@ def main():
                     help="kernel buffer length in samples")
     ap.add_argument("--skip", type=int, default=5,
                     help="startup samples left out of the statistics")
-    ap.add_argument("--baseline", type=float, metavar="SECONDS",
-                    help="only measure idle CPU load for this long, no capture")
     ap.add_argument("--csv", help="write samples to this CSV file")
     args = ap.parse_args()
-
-    if args.baseline:
-        before = cpu_ticks()
-        time.sleep(args.baseline)
-        print(f"idle baseline     : {cpu_busy(before, cpu_ticks()):.2f} % of one core"
-              f" over {args.baseline:.0f} s")
-        return
 
     dev = find_device()
     node = "/dev/" + os.path.basename(dev)
@@ -85,7 +95,8 @@ def main():
     pending = b""
 
     write(f"{dev}/buffer/enable", 1)
-    cpu_before = cpu_ticks()
+    cpu_before = runtime_ns()
+    wall_before = time.monotonic()
     try:
         with open(node, "rb", buffering=0) as f:
             while len(records) < wanted:
@@ -97,9 +108,11 @@ def main():
                     records.append(RECORD.unpack_from(pending))
                     pending = pending[RECORD.size:]
     finally:
-        cpu_after = cpu_ticks()
+        wall_s = time.monotonic() - wall_before
+        cpu_after = runtime_ns()
         write(f"{dev}/buffer/enable", 0)
 
+    captured = len(records)
     records = records[args.skip:]
     if len(records) < 3:
         sys.exit("Not enough samples captured.")
@@ -121,7 +134,7 @@ def main():
     print(f"min/max at index  : {gaps.index(min(gaps))} / {gaps.index(max(gaps))}")
     print(f"interval std dev  : {statistics.stdev(gaps) / 1e6:.4f} ms")
     print(f"gaps > 1.5 median : {len(long_gaps)}")
-    print(f"CPU busy          : {cpu_busy(cpu_before, cpu_after):.2f} % of one core")
+    print_cpu(cpu_before, cpu_after, wall_s, captured)
     for axis, name in enumerate("XYZ"):
         mean = statistics.mean(r[axis] for r in records)
         print(f"mean {name}            : {mean:8.2f} counts  {mean * scale:8.3f} m/s^2")

@@ -1,0 +1,32 @@
+requested rate    : 100 Hz
+measured rate     : 98.162 Hz
+gaps > 1.5 median : 0
+CPU userspace     :     12.23 ms
+CPU IRQ thread    :     16.44 ms
+CPU total         :     28.67 ms  (0.28 % of one core)
+CPU per sample    :     28.53 us
+
+requested rate    : 200 Hz
+measured rate     : 196.313 Hz
+gaps > 1.5 median : 0
+CPU userspace     :     16.03 ms
+CPU IRQ thread    :     29.58 ms
+CPU total         :     45.60 ms  (0.45 % of one core)
+CPU per sample    :     22.74 us
+
+requested rate    : 400 Hz
+measured rate     : 392.677 Hz
+gaps > 1.5 median : 0
+CPU userspace     :     25.46 ms
+CPU IRQ thread    :     57.48 ms
+CPU total         :     82.94 ms  (0.81 % of one core)
+CPU per sample    :     20.71 us
+
+requested rate    : 800 Hz
+measured rate     : 785.390 Hz
+gaps > 1.5 median : 0
+CPU userspace     :     49.85 ms
+CPU IRQ thread    :    122.34 ms
+CPU total         :    172.19 ms  (1.69 % of one core)
+CPU per sample    :     21.51 us
+

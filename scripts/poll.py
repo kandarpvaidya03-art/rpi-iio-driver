@@ -5,7 +5,7 @@ import os
 import statistics
 import time
 
-from capture import cpu_busy, cpu_ticks, find_device, write
+from capture import find_device, print_cpu, runtime_ns, write
 
 
 def main():
@@ -27,8 +27,9 @@ def main():
     values = []
     late = 0
 
-    cpu_before = cpu_ticks()
-    deadline = time.monotonic()
+    cpu_before = runtime_ns()
+    wall_before = time.monotonic()
+    deadline = wall_before
     for i in range(wanted):
         now = time.monotonic()
         if deadline > now:
@@ -38,7 +39,8 @@ def main():
         ts.append(time.monotonic_ns())
         values.append([int(os.pread(fd, 32, 0)) for fd in fds])
         deadline += period
-    cpu_after = cpu_ticks()
+    wall_s = time.monotonic() - wall_before
+    cpu_after = runtime_ns()
 
     for fd in fds:
         os.close(fd)
@@ -57,7 +59,7 @@ def main():
     print(f"interval min/max  : {min(gaps) / 1e6:.4f} / {max(gaps) / 1e6:.4f} ms")
     print(f"interval std dev  : {statistics.stdev(gaps) / 1e6:.4f} ms")
     print(f"missed deadlines  : {late}")
-    print(f"CPU busy          : {cpu_busy(cpu_before, cpu_after):.2f} % of one core")
+    print_cpu(cpu_before, cpu_after, wall_s, wanted)
     for axis, name in enumerate("XYZ"):
         mean = statistics.mean(v[axis] for v in values)
         print(f"mean {name}            : {mean:8.2f} counts")
