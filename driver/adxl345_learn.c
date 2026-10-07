@@ -2,12 +2,15 @@
 #include <linux/module.h>
 #include <linux/mod_devicetable.h>
 #include <linux/i2c.h>
+#include <linux/interrupt.h>
 #include <linux/regmap.h>
 #include <linux/iio/iio.h>
 
 #define ADXL345_REG_DEVID		0x00
 #define ADXL345_REG_BW_RATE		0x2c
 #define ADXL345_REG_POWER_CTL		0x2d
+#define ADXL345_REG_INT_ENABLE		0x2e
+#define ADXL345_REG_INT_MAP		0x2f
 #define ADXL345_REG_DATA_FORMAT		0x31
 #define ADXL345_REG_DATAX0		0x32
 #define ADXL345_REG_DATAY0		0x34
@@ -17,6 +20,7 @@
 #define ADXL345_BW_RATE_MASK		GENMASK(3, 0)
 #define ADXL345_BW_RATE_100HZ		0x0a
 #define ADXL345_POWER_CTL_MEASURE	BIT(3)
+#define ADXL345_INT_DATA_READY		BIT(7)
 #define ADXL345_DATA_FORMAT_FULL_RES	BIT(3)
 
 /* Full resolution: 3.9 mg/LSB * 9.80665 m/s^2 per g = 0.038246 m/s^2 per LSB */
@@ -152,7 +156,20 @@ static void adxl345_learn_standby(void *data)
 {
 	struct adxl345_learn_state *st = data;
 
+	regmap_write(st->regmap, ADXL345_REG_INT_ENABLE, 0);
 	regmap_write(st->regmap, ADXL345_REG_POWER_CTL, 0);
+}
+
+static irqreturn_t adxl345_learn_irq_thread(int irq, void *private)
+{
+	struct iio_dev *indio_dev = private;
+	struct adxl345_learn_state *st = iio_priv(indio_dev);
+	u8 buf[6];
+
+	/* Reading the data registers clears DATA_READY and releases INT1 */
+	regmap_bulk_read(st->regmap, ADXL345_REG_DATAX0, buf, sizeof(buf));
+
+	return IRQ_HANDLED;
 }
 
 static int adxl345_learn_probe(struct i2c_client *client)
@@ -201,6 +218,25 @@ static int adxl345_learn_probe(struct i2c_client *client)
 	if (ret)
 		return ret;
 
+	if (client->irq <= 0)
+		return dev_err_probe(dev, -EINVAL,
+				     "no interrupt in device tree\n");
+
+	ret = regmap_write(st->regmap, ADXL345_REG_INT_MAP, 0);
+	if (ret)
+		return dev_err_probe(dev, ret, "failed to map interrupts\n");
+
+	ret = devm_request_threaded_irq(dev, client->irq, NULL,
+					adxl345_learn_irq_thread, IRQF_ONESHOT,
+					"adxl345_learn", indio_dev);
+	if (ret)
+		return dev_err_probe(dev, ret, "failed to request IRQ\n");
+
+	ret = regmap_write(st->regmap, ADXL345_REG_INT_ENABLE,
+			   ADXL345_INT_DATA_READY);
+	if (ret)
+		return dev_err_probe(dev, ret, "failed to enable interrupt\n");
+
 	indio_dev->name = "adxl345_learn";
 	indio_dev->info = &adxl345_learn_info;
 	indio_dev->modes = INDIO_DIRECT_MODE;
@@ -231,5 +267,5 @@ static struct i2c_driver adxl345_learn_driver = {
 module_i2c_driver(adxl345_learn_driver);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Kandarp");
+MODULE_AUTHOR("Your Name");
 MODULE_DESCRIPTION("Learning IIO driver for the ADXL345 accelerometer");
